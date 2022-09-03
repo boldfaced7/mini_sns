@@ -1,6 +1,11 @@
 package service
 
-import "net/http"
+import (
+	"fmt"
+	"github.com/stretchr/gomniauth"
+	"github.com/stretchr/objx"
+	"net/http"
+)
 
 type authHandler struct {
 	next http.Handler
@@ -32,5 +37,35 @@ func MustAuth(handler http.Handler) http.Handler {
 }
 
 func loginHandler(w http.ResponseWriter, r *http.Request) {
+	provider, err := gomniauth.Provider("google")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error when trying to get provider %s: %s",
+			provider, err), http.StatusBadRequest)
+		return
+	}
+	loginUrl, err := provider.GetBeginAuthURL(nil, nil)
 
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error when trying to GetBeginAuthURL for %s: %s",
+			provider, err), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Location", loginUrl)
+	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func callbackHandler(w http.ResponseWriter, r *http.Request) {
+	provider, err := gomniauth.Provider("google")
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error when trying to get provider %s: %s",
+			provider, err), http.StatusBadRequest)
+		return
+	}
+
+	_, err = provider.CompleteAuth(objx.MustFromURLQuery(r.URL.RawQuery))
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error when trying to complete auth for %s: %s",
+			provider, err), http.StatusInternalServerError)
+		return
+	}
 }
