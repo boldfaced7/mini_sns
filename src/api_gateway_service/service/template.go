@@ -1,8 +1,8 @@
 package service
 
 import (
-	"github.com/stretchr/objx"
 	"html/template"
+	"log"
 	"net/http"
 	"path/filepath"
 	"sync"
@@ -15,15 +15,9 @@ type templateHandler struct {
 }
 
 func (t *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	log.Println("template")
 	t.once.Do(func() {
 		t.templ = template.Must(template.ParseFiles(filepath.Join("templates", t.filename)))
 	})
-
-	data := map[string]interface{}{
-		"Host": r.Host,
-	}
-	if authCookie, err := r.Cookie("auth"); err == nil {
-		data["UserData"] = objx.MustFromBase64(authCookie.Value)
-	}
-	t.templ.Execute(w, data)
+	t.templ.Execute(w, r)
 }
