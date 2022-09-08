@@ -62,10 +62,41 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = provider.CompleteAuth(objx.MustFromURLQuery(r.URL.RawQuery))
+	creds, err := provider.CompleteAuth(objx.MustFromURLQuery(r.URL.RawQuery))
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error when trying to complete auth for %s: %s",
 			provider, err), http.StatusInternalServerError)
 		return
 	}
+
+	user, err := provider.GetUser(creds)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error when trying to get user from %s: %s",
+			provider, err), http.StatusInternalServerError)
+		return
+	}
+
+	authCookieValue := objx.New(map[string]interface{}{
+		"name":       user.Name(),
+		"avatar_url": user.AvatarURL(),
+	}).MustBase64()
+	http.SetCookie(w, &http.Cookie{
+		Name:  "auth",
+		Value: authCookieValue,
+		Path:  "/",
+	})
+
+	w.Header().Set("Location", "/")
+	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func logoutHandler(w http.ResponseWriter, _ *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:   "auth",
+		Value:  "",
+		Path:   "/",
+		MaxAge: -1,
+	})
+	w.Header().Set("Location", "/")
+	w.WriteHeader(http.StatusTemporaryRedirect)
 }
