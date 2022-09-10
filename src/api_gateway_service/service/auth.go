@@ -2,12 +2,14 @@ package service
 
 import (
 	"fmt"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt"
 	"github.com/stretchr/gomniauth"
 	"github.com/stretchr/objx"
 	"net/http"
 	"time"
 )
+
+var jwtKey = []byte("secret")
 
 type authHandler struct {
 	next http.Handler
@@ -45,13 +47,14 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 			provider, err), http.StatusBadRequest)
 		return
 	}
-	loginUrl, err := provider.GetBeginAuthURL(nil, nil)
 
+	loginUrl, err := provider.GetBeginAuthURL(nil, nil)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Error when trying to GetBeginAuthURL for %s: %s",
 			provider, err), http.StatusInternalServerError)
 		return
 	}
+
 	w.Header().Set("Location", loginUrl)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
@@ -93,11 +96,16 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		Id:        user.Email(),
 		ExpiresAt: time.Now().Add(time.Hour).Unix(),
 	}
-	token := fmt.Sprintln(jwt.NewWithClaims(jwt.SigningMethodHS256, claim))
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claim)
+	tokenString, err := token.SignedString(jwtKey)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Error when trying to make jwt token"), http.StatusInternalServerError)
+		return
+	}
 
 	http.SetCookie(w, &http.Cookie{
 		Name:  "jwt",
-		Value: token,
+		Value: tokenString,
 		Path:  "/",
 	})
 
@@ -118,7 +126,23 @@ func logoutHandler(w http.ResponseWriter, _ *http.Request) {
 
 func jwtMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, err := r.Cookie("token")
+		if err != nil {
+			http.Error(w, fmt.Sprintf("no jwt token when authenticating jwt"), http.StatusBadRequest)
+			return
+		}
+		tokenString := token.Value
 
+		_, err = jwt.Parse(tokenString, func(parsedToken *jwt.Token) (interface{}, error) {
+			return jwtKey, nil
+		})
+
+		if err != nil {
+			w.Header().Set("Location", "/logout")
+			w.WriteHeader(http.StatusTemporaryRedirect)
+			return
+		}
 		next.ServeHTTP(w, r)
+
 	})
 }

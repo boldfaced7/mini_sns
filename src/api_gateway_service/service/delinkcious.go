@@ -11,7 +11,7 @@ import (
 )
 
 func RunRun() {
-	var addr = flag.String("addr", ":5000", "The addr of the application.")
+	var addr = flag.String("addr", ":8080", "The addr of the application.") // :5000
 	flag.Parse()
 
 	gomniauth.SetSecurityKey("SECURITY KEY")
@@ -19,10 +19,10 @@ func RunRun() {
 		google.New(
 			"624312092698-n5djffqsu9cocq008fr729osg7657l8m.apps.googleusercontent.com",
 			"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",
-			"http://localhost:5000/auth/callback/google",
-		))
+			"http://localhost:8080/auth/callback/google",
+		)) // :5000
 
-	lmURL, err := url.Parse("http://localhost:8080")
+	lmURL, err := url.Parse("http://localhost:7070") // :8080
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -38,11 +38,11 @@ func RunRun() {
 	http.HandleFunc("/auth/login/", loginHandler)
 	http.HandleFunc("/auth/callback/", callbackHandler)
 
-	http.Handle("/links", httputil.NewSingleHostReverseProxy(lmURL))
-	http.Handle("/followers", httputil.NewSingleHostReverseProxy(smURL))
-	http.Handle("/following", httputil.NewSingleHostReverseProxy(smURL))
-	http.Handle("/follow", httputil.NewSingleHostReverseProxy(smURL))
-	http.Handle("/unfollow", httputil.NewSingleHostReverseProxy(smURL))
+	http.Handle("/links", jwtMiddleware(httputil.NewSingleHostReverseProxy(lmURL)))
+	http.Handle("/followers", jwtMiddleware(httputil.NewSingleHostReverseProxy(smURL)))
+	http.Handle("/following", jwtMiddleware(httputil.NewSingleHostReverseProxy(smURL)))
+	http.Handle("/follow", jwtMiddleware(httputil.NewSingleHostReverseProxy(smURL)))
+	http.Handle("/unfollow", jwtMiddleware(httputil.NewSingleHostReverseProxy(smURL)))
 
 	log.Println("Starting api gateway service", *addr)
 	if err := http.ListenAndServe(*addr, nil); err != nil {
