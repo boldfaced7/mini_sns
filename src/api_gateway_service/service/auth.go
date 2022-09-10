@@ -2,9 +2,11 @@ package service
 
 import (
 	"fmt"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/stretchr/gomniauth"
 	"github.com/stretchr/objx"
 	"net/http"
+	"time"
 )
 
 type authHandler struct {
@@ -77,12 +79,25 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	authCookieValue := objx.New(map[string]interface{}{
-		"name":       user.Name(),
-		"avatar_url": user.AvatarURL(),
+		"name":  user.Name(),
+		"email": user.Email(),
 	}).MustBase64()
+
 	http.SetCookie(w, &http.Cookie{
 		Name:  "auth",
 		Value: authCookieValue,
+		Path:  "/",
+	})
+
+	claim := jwt.StandardClaims{
+		Id:        user.Email(),
+		ExpiresAt: time.Now().Add(time.Hour).Unix(),
+	}
+	token := fmt.Sprintln(jwt.NewWithClaims(jwt.SigningMethodHS256, claim))
+
+	http.SetCookie(w, &http.Cookie{
+		Name:  "jwt",
+		Value: token,
 		Path:  "/",
 	})
 
@@ -99,4 +114,11 @@ func logoutHandler(w http.ResponseWriter, _ *http.Request) {
 	})
 	w.Header().Set("Location", "/")
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func jwtMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		next.ServeHTTP(w, r)
+	})
 }
