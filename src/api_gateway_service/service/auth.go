@@ -2,7 +2,7 @@ package service
 
 import (
 	"fmt"
-	"github.com/golang-jwt/jwt"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/stretchr/gomniauth"
 	"github.com/stretchr/objx"
 	"net/http"
@@ -104,7 +104,7 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.SetCookie(w, &http.Cookie{
-		Name:  "jwt",
+		Name:  "token",
 		Value: tokenString,
 		Path:  "/",
 	})
@@ -128,7 +128,7 @@ func jwtMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, err := r.Cookie("token")
 		if err != nil {
-			http.Error(w, fmt.Sprintf("no jwt token when authenticating jwt"), http.StatusBadRequest)
+			http.Error(w, fmt.Sprintln(err), http.StatusBadRequest)
 			return
 		}
 		tokenString := token.Value
